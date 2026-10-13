@@ -3,8 +3,10 @@
 Deux assistants qui **lisent et répondent**. Ils n'écrivent dans aucun système, ne
 déclenchent rien, ne qualifient rien.
 
-Publié par la **cellule cyber de l'Université Marie et Louis Pasteur** (UMLP), sous licence
-MIT.
+> **Fait par la cellule cyber de l'UMLP, pour la cellule cyber de l'UMLP.**
+> Conçu, développé et utilisé en production par la cellule cyber de l'Université Marie et
+> Louis Pasteur (UMLP) pour ses propres besoins, puis publié sous licence MIT pour que
+> d'autres équipes puissent le reprendre, l'adapter et le déployer chez elles.
 
 | | Ce que c'est |
 |---|---|
@@ -94,7 +96,24 @@ Le socle — client de modèle, chiffrement des réglages, connecteur GitLab,
 authentification — est repris **par copie** de Slowpoke, plateforme
 de gestion d'incidents publiée par la même cellule, jamais par dépendance.
 
----
+## Contribuer
 
 Voir [`AGENTS.md`](AGENTS.md) pour les conventions d'architecture et les règles qui ne se
 négocient pas.
+
+## Licence et provenance
+
+[MIT](LICENSE) — © 2026 Université Marie et Louis Pasteur.
+
+Un des outils de la **cellule cyber de l'UMLP**, écrits pour ses propres besoins et
+publiés ensemble :
+
+| Outil | Rôle |
+|---|---|
+| **Slowpoke** | gestion des incidents de cybersécurité |
+| **Catalogue** | cartographie du SI et conformité cyber |
+| **Assistants IA** (ce dépôt) | réponses sourcées sur le corpus de procédures, analyse de journaux |
+| **Astreintes** | planning et heures d'astreinte de l'équipe |
+| **Gestion de crise cyber** | conduite d'une crise d'origine cyber : main courante, décisions, communications, exercices |
+| **Arche** | réplique hors ligne et plan de reprise YunoHost + Docker |
+| **Bureautix Fleet** | parc de postes de travail NixOS durcis, multi-entités — *expérimental, en cours* |
