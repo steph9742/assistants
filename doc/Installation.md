@@ -14,7 +14,7 @@ les exceptions sont connues.
 | Secret | Où | Pourquoi pas en base |
 |---|---|---|
 | Clé maîtresse de chiffrement | `.secrets/settings.key`, mode 0600, engendrée au premier besoin | Elle protège précisément ce qui part dans les sauvegardes. L'y mettre reviendrait à livrer la serrure avec la porte. |
-| Secret client OIDC | Variable `OUATE_CLIENT_SECRET` | `genericOAuth` lit sa configuration à l'initialisation du module, avant que la base soit joignable. |
+| Secret client OIDC | Variable `OIDC_CLIENT_SECRET` | `genericOAuth` lit sa configuration à l'initialisation du module, avant que la base soit joignable. |
 
 **Tout le reste** — jeton de l'Open WebUI, jetons GitLab, identifiants Nextcloud — est
 chiffré en base et se saisit dans l'interface de réglages.
@@ -63,19 +63,27 @@ côté dex :
 ```
 PUBLIC_URL=https://exemple.fr
 BASE_PATH=/assistant
-OUATE_REDIRECT_URI=https://exemple.fr/assistant/api/auth/oauth2/callback/ouate
+OIDC_PROVIDER_ID=oidc
+OIDC_REDIRECT_URI=https://exemple.fr/assistant/api/auth/oauth2/callback/oidc
 ```
 
-`OUATE_REDIRECT_URI` n'est **pas** facultative en sous-chemin. Le proxy retire le préfixe
+`OIDC_REDIRECT_URI` n'est **pas** facultative en sous-chemin. Le proxy retire le préfixe
 avant d'atteindre le serveur, donc l'URL de rappel que Better Auth calculerait seul perdrait
 le `/assistant` — et dex refuserait la redirection. Elle doit valoir **exactement** ce qui
 est déclaré côté dex. À la racine, laisser la variable vide.
+
+Le fragment final de cette URL est `OIDC_PROVIDER_ID`, et les deux ne se changent qu'ensemble
+— l'un dans le `.env`, l'autre dans la déclaration côté dex.
+
+> **Les anciens noms `OUATE_*` restent lus en repli**, sans date de péremption : une instance
+> en service n'a rien à changer. Le nouveau nom l'emporte dès qu'il porte une valeur non vide.
+> Voir `packages/auth/src/env.ts`.
 
 ## Qui peut entrer
 
 | Variable | Effet |
 |---|---|
-| `OUATE_GROUPE_ADMIN` | groupe qui confère le rôle administrateur (défaut `admins`) |
+| `OIDC_GROUPE_ADMIN` | groupe qui confère le rôle administrateur (défaut `admins`) |
 | `OIDC_ADMINS_SEULEMENT=true` | **les administrateurs seuls** — tout autre compte reçoit un 403 explicite |
 | `OIDC_ADMINS_SEULEMENT=false` | tout membre du groupe déclaré dans le réglage `instance.groupe_sso` |
 

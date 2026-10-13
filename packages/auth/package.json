@@ -18,6 +18,7 @@
         "typescript": "^5"
     },
     "exports": {
-        ".": "./src/index.ts"
+        ".": "./src/index.ts",
+        "./env": "./src/env.ts"
     }
 }

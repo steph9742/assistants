@@ -11,14 +11,14 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@assistants/database";
 import * as tablesAuth from "@assistants/database/auth-schema";
 import { admin, genericOAuth } from "better-auth/plugins";
-import { lireSecret } from "./secret-env";
+import { envOidc, lireSecretOidc } from "./env";
 
 /**
  * Ce que dex nous envoie. `email` est facultatif au sens des types de Better Auth : un
  * fournisseur peut ne pas le renvoyer. On refuse la connexion plutôt que d'inventer une
  * adresse — un compte sans identifiant vérifiable n'a rien à faire ici.
  */
-type ProfilOuate = {
+type ProfilOIDC = {
     email?: string | null
     groups?: string[] | null
     federated_claims?: { user_id?: string } | null
@@ -33,7 +33,36 @@ type ProfilOuate = {
  * le compte de secours reste une porte — ce qui est exactement ce dont on a besoin le jour
  * où le SSO est en panne.
  */
-const oidcConfigure = !!(process.env.OUATE_CLIENT_ID && process.env.OUATE_DISCOVERY_URL)
+const oidcConfigure = !!(envOidc('OIDC_CLIENT_ID') && envOidc('OIDC_DISCOVERY_URL'))
+
+/**
+ * L'IDENTIFIANT DE FOURNISSEUR EST UN MORCEAU D'URL, pas une étiquette.
+ *
+ * Better Auth en dérive la route de rappel — `/api/auth/oauth2/callback/<identifiant>` — et
+ * cette adresse est ENREGISTRÉE chez le fournisseur. Le changer exige de la changer là-bas
+ * aussi, faute de quoi le retour de connexion tombe sur un 404.
+ *
+ * Son défaut est donc historique et ne doit pas bouger : une instance déjà déclarée chez son
+ * fournisseur continue de fonctionner sans rien toucher. Une installation neuve le règle
+ * librement — `.env.example` propose `oidc`.
+ */
+const FOURNISSEUR = envOidc('OIDC_PROVIDER_ID') || 'ouate'
+
+/** Ce que le bouton de connexion affiche. À défaut, l'identifiant en capitales. */
+const LIBELLE = envOidc('OIDC_LIBELLE') || FOURNISSEUR.toUpperCase()
+
+/**
+ * CE QUE L'INTERFACE A BESOIN DE SAVOIR DU SSO, et rien de plus.
+ *
+ * La page de connexion doit poster le bon identifiant de fournisseur et afficher le bon
+ * libellé. Les régler une seconde fois dans l'interface donnerait deux sources de vérité pour
+ * une seule valeur, et leur divergence ne se verrait qu'à la connexion — « fournisseur
+ * inconnu », sans dire lequel était attendu. Elle les demande donc au serveur.
+ *
+ * Aucun secret ici : un identifiant de client et un libellé sont publics par construction,
+ * puisqu'ils transitent dans l'URL de redirection que le navigateur suit.
+ */
+export const SSO = { configure: oidcConfigure, fournisseur: FOURNISSEUR, libelle: LIBELLE } as const
 
 // ---------------------------------------------------------------------------------------
 // LE RÔLE CALCULÉ DEPUIS LES GROUPES N'ATTEINT PAS LA BASE. Mécanique reprise du Catalogue,
@@ -67,7 +96,7 @@ function consommerRole(email: string | undefined): string | undefined {
 
 /** `admin` si l'annuaire place la personne dans le groupe déclaré, `user` sinon. */
 export function roleDesGroupes(groupes: unknown): string {
-    const attendu = (process.env.OUATE_GROUPE_ADMIN || 'admins').trim()
+    const attendu = envOidc('OIDC_GROUPE_ADMIN') || 'admins'
     const liste = Array.isArray(groupes)
         ? groupes.map(String)
         : String(groupes ?? '').split(',').map(g => g.trim()).filter(Boolean)
@@ -92,8 +121,8 @@ async function appliquerRole(donnees: Record<string, unknown>) {
 
 if (!oidcConfigure) {
     console.warn(
-        "⚠️  SSO désactivé : OUATE_CLIENT_ID ou OUATE_DISCOVERY_URL n'est pas renseigné. "
-        + "Seul le compte de secours peut se connecter.",
+        "⚠️  SSO désactivé : OIDC_CLIENT_ID ou OIDC_DISCOVERY_URL n'est pas renseigné "
+        + "(anciens noms OUATE_* également acceptés). Seul le compte de secours peut se connecter.",
     )
 }
 
@@ -130,11 +159,11 @@ const auth = betterAuth({
         // fournisseur déclaré, aucune connexion réseau n'est tentée au démarrage.
         genericOAuth({
             config: !oidcConfigure ? [] : [{
-                providerId: "ouate",
-                clientId: process.env.OUATE_CLIENT_ID!,
-                clientSecret: lireSecret('OUATE_CLIENT_SECRET')!,
-                discoveryUrl: process.env.OUATE_DISCOVERY_URL!,
-                ...(process.env.OUATE_REDIRECT_URI ? { redirectURI: process.env.OUATE_REDIRECT_URI } : {}),
+                providerId: FOURNISSEUR,
+                clientId: envOidc('OIDC_CLIENT_ID')!,
+                clientSecret: lireSecretOidc('OIDC_CLIENT_SECRET')!,
+                discoveryUrl: envOidc('OIDC_DISCOVERY_URL')!,
+                ...(envOidc('OIDC_REDIRECT_URI') ? { redirectURI: envOidc('OIDC_REDIRECT_URI')! } : {}),
                 scopes: ['openid', 'profile', 'email', 'groups', 'federated:id'],
 
                 // RELIT LE PROFIL À CHAQUE CONNEXION, et c'est indispensable ici.
@@ -146,9 +175,9 @@ const auth = betterAuth({
                 // sans aucun moyen pour son titulaire de s'en sortir.
                 overrideUserInfo: true,
                 mapProfileToUser(brut) {
-                    const profile = brut as ProfilOuate
+                    const profile = brut as ProfilOIDC
                     if (!profile.email) {
-                        throw new Error("Le jeton OUATE ne porte pas d'adresse de courriel.")
+                        throw new Error("Le jeton OIDC ne porte pas d'adresse de courriel.")
                     }
                     const groupes = profile.groups ?? []
                     // Mémorisé ICI et renvoyé ci-dessous : renvoyé, il sert aux versions qui
@@ -158,8 +187,8 @@ const auth = betterAuth({
                         email: profile.email,
                         role: roleDesGroupes(groupes),
                         groupes: groupes.join(','),
-                        image: process.env.OUATE_NC_URL
-                            ? `${process.env.OUATE_NC_URL}/avatar/${profile.federated_claims?.user_id}/512`
+                        image: envOidc('OIDC_NC_URL')
+                            ? `${envOidc('OIDC_NC_URL')}/avatar/${profile.federated_claims?.user_id}/512`
                             : undefined,
                     }
                 },

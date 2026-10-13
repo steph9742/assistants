@@ -64,20 +64,36 @@ services:
       # Variantes _FILE : elles PRIMENT sur les variables ci-dessus. Le volume .secrets est
       # déjà monté ; y déposer un fichier en 0600 sort le secret de `docker inspect`.
       BETTER_AUTH_SECRET_FILE: ${BETTER_AUTH_SECRET_FILE:-}
+      OIDC_CLIENT_SECRET_FILE: ${OIDC_CLIENT_SECRET_FILE:-}
       OUATE_CLIENT_SECRET_FILE: ${OUATE_CLIENT_SECRET_FILE:-}
       TRUSTED_ORIGINS: ${PUBLIC_URL:-http://localhost:8080}
       # SSO OIDC (dex). Sans ces lignes, les variables du .env n'atteignent pas le
       # conteneur : le fournisseur n'est jamais déclaré et le SSO reste inopérant quoi
-      # qu'on renseigne. `OUATE_CLIENT_ID` vide = SSO désactivé, compte de secours seul.
+      # qu'on renseigne. `OIDC_CLIENT_ID` vide = SSO désactivé, compte de secours seul.
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
+      OIDC_NC_URL: ${OIDC_NC_URL:-}
+      # SOUS-CHEMIN UNIQUEMENT. Le proxy retire le préfixe avant le serveur, donc l'URL de
+      # rappel calculée automatiquement le perdrait et le fournisseur refuserait la
+      # redirection. Doit valoir exactement ce qui est déclaré chez lui.
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_GROUPE_ADMIN: ${OIDC_GROUPE_ADMIN:-}
+      # Fragment de l'URL de rappel enregistrée chez le fournisseur : à ne changer qu'avec
+      # elle. Vide = le défaut historique du code, qui garde une instance déjà déclarée en
+      # état de marche. Voir packages/auth/src/env.ts.
+      OIDC_PROVIDER_ID: ${OIDC_PROVIDER_ID:-}
+      OIDC_LIBELLE: ${OIDC_LIBELLE:-}
+      # ANCIENS NOMS, LUS EN REPLI ET SANS DATE DE PÉREMPTION. Ils sont passés en plus des
+      # précédents, pas à leur place : un `.env` déjà en service continue de marcher sans
+      # être touché. Le défaut `admins` du groupe n'est plus ici — il est dans le code, une
+      # seule fois.
       OUATE_CLIENT_ID: ${OUATE_CLIENT_ID:-}
       OUATE_CLIENT_SECRET: ${OUATE_CLIENT_SECRET:-}
       OUATE_DISCOVERY_URL: ${OUATE_DISCOVERY_URL:-}
       OUATE_NC_URL: ${OUATE_NC_URL:-}
-      # SOUS-CHEMIN UNIQUEMENT. Le proxy retire le préfixe avant le serveur, donc l'URL de
-      # rappel calculée automatiquement le perdrait et dex refuserait la redirection. Doit
-      # valoir exactement ce qui est déclaré côté dex.
       OUATE_REDIRECT_URI: ${OUATE_REDIRECT_URI:-}
-      OUATE_GROUPE_ADMIN: ${OUATE_GROUPE_ADMIN:-admins}
+      OUATE_GROUPE_ADMIN: ${OUATE_GROUPE_ADMIN:-}
       # true = administrateurs seuls, quel que soit le groupe SSO déclaré. Réglage de phase
       # d'essai : on vérifie ce que l'assistant répond avant de l'ouvrir à l'équipe.
       OIDC_ADMINS_SEULEMENT: ${OIDC_ADMINS_SEULEMENT:-false}
@@ -93,7 +109,7 @@ services:
     # nom PUBLIC — qui résout vers l'adresse externe de la machine, que le conteneur ne sait
     # pas rejoindre faute de retour de boucle NAT.
     #
-    # Constaté au premier démarrage sur Ouate : « Discovery fetch failed for "ouate" :
+    # Constaté au premier démarrage : « Discovery fetch failed :
     # Unable to connect », sur une URL qui répond parfaitement depuis un navigateur du même
     # serveur. Et Better Auth ne se contente pas d'avertir — il REFUSE DE DÉMARRER, pour ne
     # pas laisser un fournisseur à moitié initialisé changer d'émetteur en cours de route.
@@ -105,7 +121,8 @@ services:
     # Les valeurs par défaut sont des noms jamais résolus ailleurs : l'entrée reste inerte
     # tant que la variable n'est pas renseignée.
     extra_hosts:
-      - "${HOTE_OUATE:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_PORTAIL:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_OUATE:-h6.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_SNIFF:-h2.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_CATALOGUE:-h3.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_NEXTCLOUD:-h4.interne.invalide}:${IP_VM:-host-gateway}"
@@ -191,7 +208,8 @@ services:
     # serveur, et l'oublier ici donnerait une source qui échoue sans que l'interface marche
     # moins bien — donc une panne qu'on ne verrait que dans le témoin de fraîcheur.
     extra_hosts:
-      - "${HOTE_OUATE:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_PORTAIL:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_OUATE:-h6.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_SNIFF:-h2.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_CATALOGUE:-h3.interne.invalide}:${IP_VM:-host-gateway}"
       - "${HOTE_NEXTCLOUD:-h4.interne.invalide}:${IP_VM:-host-gateway}"

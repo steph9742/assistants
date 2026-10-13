@@ -221,6 +221,12 @@ export function useApi() {
         consultations: (limite = 200) =>
             appeler<{ consultations: any[] }>(`/api/journal?limite=${limite}`),
 
+        /**
+         * Le SSO tel que le serveur l'a déclaré — identifiant de fournisseur et libellé.
+         * Route publique : la page de connexion l'appelle sans session.
+         */
+        sso: () => appeler<{ configure: boolean, fournisseur: string, libelle: string }>('/api/sso'),
+
         session: () => $fetch<{ user?: { email: string } }>(`${base}/api/auth/get-session`, {
             credentials: 'include',
         }).then(r => r?.user ?? null),

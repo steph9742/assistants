@@ -14,9 +14,31 @@ const enCours = ref(false)
 const secoursOuvert = ref(false)
 
 /**
+ * LE FOURNISSEUR VIENT DU SERVEUR, et il n'y a pas de second endroit où le régler.
+ *
+ * L'identifiant posté ci-dessous doit être exactement celui que le serveur a déclaré à Better
+ * Auth. L'écrire ici en dur marchait tant qu'un seul déploiement existait ; réglable des deux
+ * côtés, il diverge un jour, et la panne se lit « fournisseur inconnu » sans dire lequel était
+ * attendu.
+ *
+ * Chargé au rendu et non au clic : le bouton porte le libellé.
+ */
+const { data: sso } = await useAsyncData('sso', () => api.sso(), {
+    default: () => ({ configure: false, fournisseur: '', libelle: 'SSO' }),
+})
+
+/**
  * Entrée par le SSO.
  */
-async function sso() {
+async function connecterSso() {
+    // Deux empêchements, deux corrections différentes : un SSO non configuré se règle dans le
+    // `.env` du serveur, un serveur muet se règle ailleurs. Les confondre coûte une heure.
+    if (!sso.value.configure) {
+        erreur.value = sso.value.fournisseur
+            ? "Le SSO n'est pas configuré sur ce serveur : seul le compte de secours peut se connecter."
+            : "Le serveur n'a pas répondu : impossible de savoir si le SSO est disponible."
+        return
+    }
     enCours.value = true
     erreur.value = ''
     try {
@@ -31,7 +53,7 @@ async function sso() {
 
         const r = await $fetch<{ url?: string }>(`${api.base}/api/auth/sign-in/oauth2`, {
             method: 'POST', credentials: 'include',
-            body: { providerId: 'ouate', callbackURL: retour },
+            body: { providerId: sso.value.fournisseur, callbackURL: retour },
         })
         if (!r?.url) throw new Error("Le serveur n'a pas rendu d'adresse de redirection.")
         window.location.href = r.url
@@ -77,8 +99,8 @@ async function connecter() {
       <button
         :disabled="enCours"
         class="mt-6 w-full rounded-md bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-700 disabled:opacity-50"
-        @click="sso"
-      >{{ enCours ? 'Redirection…' : 'Se connecter avec OUATE' }}</button>
+        @click="connecterSso"
+      >{{ enCours ? 'Redirection…' : `Se connecter avec ${sso.libelle}` }}</button>
 
       <p class="mt-6 text-center text-xs text-stone-400">
         <button class="underline hover:text-stone-600" @click="secoursOuvert = !secoursOuvert">

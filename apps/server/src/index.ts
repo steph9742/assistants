@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
-import { auth } from "@assistants/auth";
+import { auth, SSO } from "@assistants/auth";
 import { reglagesRouter } from "./routers/reglages";
 import { journauxRouter } from "./routers/journaux";
 import { assistantRouter, lacunesAdminRouter, journalRouter } from "./routers/assistant";
@@ -65,6 +65,17 @@ const app = new Elysia()
     // qu'elle est. Nous réclamions cette information à Sniff sans l'exposer nous-mêmes.
     .get('/health', () => VERSION)
     .get('/api/sante', () => VERSION)
+    // CE QUE LA PAGE DE CONNEXION A BESOIN DE SAVOIR, et elle seule peut l'apprendre ici.
+    //
+    // L'identifiant de fournisseur qu'elle poste doit être EXACTEMENT celui que le serveur a
+    // déclaré. Le régler des deux côtés donnerait deux sources de vérité pour une valeur
+    // unique, et leur divergence ne se verrait qu'à la connexion, sous la forme d'un
+    // « fournisseur inconnu » qui ne dit pas lequel était attendu.
+    //
+    // Publique à dessein : un identifiant de client et un libellé de bouton transitent déjà
+    // dans l'URL que le navigateur suit vers le fournisseur. Rien à protéger, et une route
+    // authentifiée serait inatteignable depuis la page de connexion.
+    .get('/api/sso', () => SSO)
     .use(reglagesRouter)
     .use(journauxRouter)
     .use(assistantRouter)

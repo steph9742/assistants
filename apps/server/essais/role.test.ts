@@ -32,9 +32,29 @@ describe('roleDesGroupes', () => {
     // Le nom du groupe se règle : un annuaire n'a pas toujours celui-là, et un nom faux ne
     // se voit qu'au moment où plus personne n'est administrateur.
     test('le nom du groupe est réglable', () => {
-        process.env.OUATE_GROUPE_ADMIN = 'cyber-admins'
+        process.env.OIDC_GROUPE_ADMIN = 'cyber-admins'
         expect(roleDesGroupes(['admins'])).toBe('user')
         expect(roleDesGroupes(['cyber-admins'])).toBe('admin')
+        delete process.env.OIDC_GROUPE_ADMIN
+    })
+
+    // L'ancien nom reste lu : un `.env` en service ne doit pas perdre son réglage au
+    // renommage. Sans cet essai, la régression ne se verrait qu'au jour où PERSONNE n'est
+    // plus administrateur — le groupe déclaré redevenant le défaut `admins`.
+    test("l'ancien nom de la variable est encore honoré", () => {
+        process.env.OUATE_GROUPE_ADMIN = 'cyber-admins'
+        expect(roleDesGroupes(['cyber-admins'])).toBe('admin')
+        expect(roleDesGroupes(['admins'])).toBe('user')
+        delete process.env.OUATE_GROUPE_ADMIN
+    })
+
+    // Et le nouveau l'emporte, pour que la bascule soit un ajout et non une cohabitation.
+    test('le nom actuel prime sur l\'ancien', () => {
+        process.env.OIDC_GROUPE_ADMIN = 'neufs'
+        process.env.OUATE_GROUPE_ADMIN = 'anciens'
+        expect(roleDesGroupes(['neufs'])).toBe('admin')
+        expect(roleDesGroupes(['anciens'])).toBe('user')
+        delete process.env.OIDC_GROUPE_ADMIN
         delete process.env.OUATE_GROUPE_ADMIN
     })
 
