@@ -1,0 +1,23 @@
+# Le contexte de build est envoyé en entier au démon Docker. Sans ce fichier, il embarque
+# node_modules — 374 Mo — et les artefacts de build, qui seront de toute façon reconstruits
+# dans l'image.
+#
+# Trouvé en montant la pile pour de vrai : le build restait des minutes sur « Sending build
+# context », sans que rien n'indique pourquoi. Un `.dockerignore` absent ne produit aucune
+# erreur, seulement de la lenteur — ce qui se met sur le compte de la machine.
+node_modules
+.turbo
+.nuxt
+.output
+dist
+
+# Secrets et état local : ils n'ont rien à faire dans une image.
+.env
+.env.*
+.secrets
+backup
+
+.git
+.gitignore
+.DS_Store
+.claude

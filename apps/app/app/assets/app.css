@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+    --font-geist: "Geist", ui-sans-serif, system-ui, sans-serif;
+    --font-geistmono: "Geist Mono", ui-monospace, "SF Mono", monospace;
+}
+
+/* Réservé aux transitions, conformément aux conventions de la maison. */
+.fondu-enter-active, .fondu-leave-active { transition: opacity .15s ease; }
+.fondu-enter-from, .fondu-leave-to { opacity: 0; }

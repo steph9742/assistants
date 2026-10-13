@@ -1,0 +1,284 @@
+# Tout tourne dans le réseau interne `assistants-network`.
+# Seul le reverse-proxy (nginx) expose un port sur l'hôte : c'est l'unique porte d'entrée.
+# Le navigateur atteint le front ET l'API (/api) via cette même origine ; le SSR et
+# l'API↔DB communiquent en interne par nom de service.
+#
+# Repris de la composition du Catalogue, avec deux différences :
+#   — l'image PostgreSQL porte pgvector (la colonne `passage.vecteur` en dépend) ;
+#   — un service `synchro` remplace le cron de l'hôte. Voir son commentaire : ce n'est pas
+#     une commodité, c'est ce qui garde l'indexation hors du processus de l'API.
+x-server-build: &server-build
+  context: .
+  dockerfile: apps/server/Dockerfile
+  # Version déployée, exposée sur /health. Sans elle, un écran resté à l'ancienne version
+  # après un `git pull` ressemble à un défaut d'interface, et rien ne permet de trancher.
+  # Les deux se renseignent depuis l'hôte au moment du build :
+  #   GIT_COMMIT=$(git rev-parse --short HEAD) BUILD_DATE=$(date -Iseconds) docker compose build
+  # Absentes, /health rend « inconnue », ce qui n'est pas « ancienne ».
+  args:
+    GIT_COMMIT: ${GIT_COMMIT:-inconnue}
+    BUILD_DATE: ${BUILD_DATE:-inconnue}
+
+services:
+  postgres:
+    # pgvector et non postgres:18-alpine : `passage.vecteur` est une colonne `vector(768)`,
+    # et la première migration crée l'extension. Avec l'image nue, la migration échoue au
+    # premier démarrage — sur une erreur qui ne nomme pas l'image.
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-assistants}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-assistants}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - assistants-network
+
+  # Applique les migrations puis s'arrête (le serveur attend sa réussite).
+  migrate:
+    build: *server-build
+    image: assistants-server:latest
+    command: ["/app/migrate"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-assistants}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - assistants-network
+
+  server:
+    build: *server-build
+    image: assistants-server:latest
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-assistants}
+      BETTER_AUTH_URL: ${PUBLIC_URL:-http://localhost:8080}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me}
+      # Variantes _FILE : elles PRIMENT sur les variables ci-dessus. Le volume .secrets est
+      # déjà monté ; y déposer un fichier en 0600 sort le secret de `docker inspect`.
+      BETTER_AUTH_SECRET_FILE: ${BETTER_AUTH_SECRET_FILE:-}
+      OUATE_CLIENT_SECRET_FILE: ${OUATE_CLIENT_SECRET_FILE:-}
+      TRUSTED_ORIGINS: ${PUBLIC_URL:-http://localhost:8080}
+      # SSO OIDC (dex). Sans ces lignes, les variables du .env n'atteignent pas le
+      # conteneur : le fournisseur n'est jamais déclaré et le SSO reste inopérant quoi
+      # qu'on renseigne. `OUATE_CLIENT_ID` vide = SSO désactivé, compte de secours seul.
+      OUATE_CLIENT_ID: ${OUATE_CLIENT_ID:-}
+      OUATE_CLIENT_SECRET: ${OUATE_CLIENT_SECRET:-}
+      OUATE_DISCOVERY_URL: ${OUATE_DISCOVERY_URL:-}
+      OUATE_NC_URL: ${OUATE_NC_URL:-}
+      # SOUS-CHEMIN UNIQUEMENT. Le proxy retire le préfixe avant le serveur, donc l'URL de
+      # rappel calculée automatiquement le perdrait et dex refuserait la redirection. Doit
+      # valoir exactement ce qui est déclaré côté dex.
+      OUATE_REDIRECT_URI: ${OUATE_REDIRECT_URI:-}
+      OUATE_GROUPE_ADMIN: ${OUATE_GROUPE_ADMIN:-admins}
+      # true = administrateurs seuls, quel que soit le groupe SSO déclaré. Réglage de phase
+      # d'essai : on vérifie ce que l'assistant répond avant de l'ouvrir à l'équipe.
+      OIDC_ADMINS_SEULEMENT: ${OIDC_ADMINS_SEULEMENT:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # RETOUR DE BOUCLE VERS L'HÔTE — indispensable, et le symptôme est trompeur.
+    #
+    # Tout ce que l'assistant interroge vit sur CETTE MÊME MACHINE, derrière le même nginx :
+    # dex, GitLab, Nextcloud, le Catalogue, Sniff. Le conteneur va donc les chercher à leur
+    # nom PUBLIC — qui résout vers l'adresse externe de la machine, que le conteneur ne sait
+    # pas rejoindre faute de retour de boucle NAT.
+    #
+    # Constaté au premier démarrage sur Ouate : « Discovery fetch failed for "ouate" :
+    # Unable to connect », sur une URL qui répond parfaitement depuis un navigateur du même
+    # serveur. Et Better Auth ne se contente pas d'avertir — il REFUSE DE DÉMARRER, pour ne
+    # pas laisser un fournisseur à moitié initialisé changer d'émetteur en cours de route.
+    #
+    # Slowpoke épingle l'adresse de la VM en dur ; le Catalogue passe par `host-gateway`.
+    # Ici les deux sont possibles : `IP_VM` vide retombe sur `host-gateway`, qui suffit dans
+    # la plupart des cas ; la renseigner reproduit exactement ce que fait Slowpoke.
+    #
+    # Les valeurs par défaut sont des noms jamais résolus ailleurs : l'entrée reste inerte
+    # tant que la variable n'est pas renseignée.
+    extra_hosts:
+      - "${HOTE_OUATE:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_SNIFF:-h2.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_CATALOGUE:-h3.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_NEXTCLOUD:-h4.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_IA:-h5.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_AUTRE:-h6.interne.invalide}:${IP_VM:-host-gateway}"
+    volumes:
+      # CLÉ DE CHIFFREMENT DES RÉGLAGES.
+      #
+      # Les jetons GitLab, Nextcloud, Slowpoke et Open WebUI sont chiffrés en base ; la clé
+      # vit ICI — hors de la base, puisque c'est précisément le contenu de la base (et de
+      # ses sauvegardes hors-site) qu'elle protège. La mettre dedans reviendrait à livrer la
+      # serrure avec la porte.
+      #
+      # Le même volume porte le mot de passe de secours déposé par le seed. Sous Linux il
+      # doit appartenir à l'uid 1001 : `sudo chown 1001:1001 .secrets`.
+      - ./.secrets:/app/.secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - assistants-network
+
+  app:
+    build:
+      context: .
+      dockerfile: apps/app/Dockerfile
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      NUXT_APP_BASE_URL: ${BASE_PATH:-}/
+      # Navigateur → via le proxy (origine publique) ; SSR → API en interne.
+      NUXT_PUBLIC_SERVER_BASE_URL: ${PUBLIC_URL:-http://localhost:8080}${BASE_PATH:-}
+      NUXT_SERVER_BASE_URL_INTERNAL: http://server:4000
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - assistants-network
+
+  # Unique service exposé sur l'hôte.
+  reverse:
+    image: nginx:alpine
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      BASE_PATH: ${BASE_PATH:-}
+    volumes:
+      - ./deploy/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      - app
+      - server
+    networks:
+      - assistants-network
+
+  # INDEXATION — un processus COURT, relancé en boucle. Pas une tâche dans l'API.
+  #
+  # Le binaire est lancé, il indexe, il MEURT, et sa mémoire est rendue. Le conteneur ne
+  # garde qu'un shell endormi entre deux passes. C'est la forme qui compte :
+  #
+  #   — le serveur hôte a ~11 Go disponibles mais un swap SATURÉ (980 Mo sur 980, zéro
+  #     libre). Plus de coussin : la prochaine pression mémoire va à l'OOM killer, qui tue
+  #     le plus gros RSS. Sur cette machine, c'est GitLab — pas le coupable ;
+  #   — l'extraction de texte est le poste à pics, et elle dépend de fichiers déposés par
+  #     des tiers. Un gros document peut allouer plusieurs centaines de mégaoctets d'un
+  #     coup, sans prévenir.
+  #
+  # Une tâche dans l'API emporterait l'interface avec elle. Ici le pic est isolé dans un
+  # processus jetable, et `mem_limit` le tue proprement plutôt que de laisser l'OOM killer
+  # choisir sa victime ailleurs.
+  #
+  # La boucle relance toutes les 30 min ; c'est le binaire qui décide s'il y a lieu de
+  # synchroniser, d'après `synchro.intervalle_h`. Il purge aussi le journal de consultation.
+  synchro:
+    build: *server-build
+    image: assistants-server:latest
+    restart: unless-stopped
+    mem_limit: ${SYNCHRO_MEM:-1g}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-assistants}
+    # L'indexation va chercher GitLab et Nextcloud à leur nom public : même besoin que le
+    # serveur, et l'oublier ici donnerait une source qui échoue sans que l'interface marche
+    # moins bien — donc une panne qu'on ne verrait que dans le témoin de fraîcheur.
+    extra_hosts:
+      - "${HOTE_OUATE:-h1.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_SNIFF:-h2.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_CATALOGUE:-h3.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_NEXTCLOUD:-h4.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_IA:-h5.interne.invalide}:${IP_VM:-host-gateway}"
+      - "${HOTE_AUTRE:-h6.interne.invalide}:${IP_VM:-host-gateway}"
+    volumes:
+      - ./.secrets:/app/.secrets
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          /app/synchro || echo "synchro : sortie $$? — voir l'etat des sources dans l'interface"
+          sleep ${SYNCHRO_PERIODE:-1800}
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - assistants-network
+
+  # À la demande : crée le compte de secours. `docker compose run --rm seed`
+  seed:
+    build: *server-build
+    image: assistants-server:latest
+    command: ["/app/seed"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-assistants}
+      BETTER_AUTH_URL: ${PUBLIC_URL:-http://localhost:8080}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-secours@assistants.local}
+    volumes:
+      - ./.secrets:/app/.secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    profiles: ["seed"]
+    networks:
+      - assistants-network
+
+  # Sauvegarde quotidienne, VÉRIFIÉE.
+  #
+  # Reprise du Catalogue, où elle a été écrite après la perte totale de la base du
+  # 29/07/2026 : la seule sauvegarde existante faisait 0 octet. Ce service contrôle donc
+  # chaque dump (taille + présence de tables) et supprime les fichiers invalides plutôt que
+  # de laisser croire à une sauvegarde. Les dumps atterrissent dans ./backup, HORS du volume
+  # Docker — pour survivre à la destruction du volume, qui est précisément ce qui s'est
+  # produit.
+  sauvegarde:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    volumes:
+      - ./backup:/backup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      GARDER: ${ASSISTANTS_BACKUP_KEEP:-14}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f="/backup/auto-$$(date +%Y%m%d-%H%M%S).sql.gz"
+          if pg_dump -h postgres -U ${POSTGRES_USER:-postgres} --clean --if-exists ${POSTGRES_DB:-assistants} | gzip > "$$f"; then
+            taille=$$(wc -c < "$$f")
+            tables=$$(gunzip -c "$$f" | grep -c "^CREATE TABLE" || true)
+            if [ "$$taille" -lt 1024 ] || [ "$$tables" -lt 1 ]; then
+              echo "sauvegarde invalide ($$taille o, $$tables tables) — supprimee"; rm -f "$$f"
+            else
+              echo "sauvegarde ok : $$f ($$taille o, $$tables tables)"
+            fi
+          else
+            echo "echec pg_dump"; rm -f "$$f"
+          fi
+          ls -1t /backup/auto-*.sql.gz 2>/dev/null | tail -n +$$((GARDER + 1)) | xargs -r rm -f
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - assistants-network
+
+networks:
+  assistants-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

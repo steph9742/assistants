@@ -1,0 +1,29 @@
+{
+    "name": "@assistants/server",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "bun --watch src/index.ts",
+        "build": "bun build src/index.ts --target bun --outdir dist",
+        "typecheck": "tsc --noEmit",
+        "synchro": "bun run src/synchro.ts",
+        "seed": "bun run src/seed.ts"
+    },
+    "dependencies": {
+        "@assistants/auth": "*",
+        "@assistants/database": "*",
+        "@elysiajs/cors": "^1.4.0",
+        "drizzle-orm": "^0.45.1",
+        "elysia": "^1.4.10",
+        "fast-xml-parser": "^5.2.0",
+        "fflate": "^0.8.3",
+        "mammoth": "^1.11.0",
+        "unpdf": "^1.3.0"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
+}

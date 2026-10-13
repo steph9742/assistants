@@ -1,0 +1,529 @@
+{
+  "id": "4c8bf684-915e-4df5-82dd-7c95ada43560",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.document": {
+      "name": "document",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chemin": {
+          "name": "chemin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empreinte": {
+          "name": "empreinte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_doc": {
+          "name": "type_doc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_revision": {
+          "name": "date_revision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extraction": {
+          "name": "extraction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'complete'"
+        },
+        "indexe_le": {
+          "name": "indexe_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "document_source_chemin": {
+          "name": "document_source_chemin",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "chemin",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "document_statut": {
+          "name": "document_statut",
+          "columns": [
+            {
+              "expression": "statut",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "document_source_id_source_id_fk": {
+          "name": "document_source_id_source_id_fk",
+          "tableFrom": "document",
+          "tableTo": "source",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lacune": {
+      "name": "lacune",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "question": {
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sources_consultees": {
+          "name": "sources_consultees",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "meilleur_score": {
+          "name": "meilleur_score",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utilisateur": {
+          "name": "utilisateur",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date": {
+          "name": "date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "traitee": {
+          "name": "traitee",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "lacune_date": {
+          "name": "lacune_date",
+          "columns": [
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.passage": {
+      "name": "passage",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "document_id": {
+          "name": "document_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titre_section": {
+          "name": "titre_section",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ancre": {
+          "name": "ancre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "texte": {
+          "name": "texte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tsv": {
+          "name": "tsv",
+          "type": "tsvector",
+          "primaryKey": false,
+          "notNull": false,
+          "generated": {
+            "as": "to_tsvector('french', coalesce(titre_section, '') || ' ' || texte)",
+            "type": "stored"
+          }
+        },
+        "vecteur": {
+          "name": "vecteur",
+          "type": "vector(768)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "passage_tsv": {
+          "name": "passage_tsv",
+          "columns": [
+            {
+              "expression": "\"tsv\"",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "passage_document": {
+          "name": "passage_document",
+          "columns": [
+            {
+              "expression": "document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "passage_document_id_document_id_fk": {
+          "name": "passage_document_id_document_id_fk",
+          "tableFrom": "passage",
+          "tableTo": "document",
+          "columnsFrom": [
+            "document_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.source": {
+      "name": "source",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actif": {
+          "name": "actif",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "jeton_chiffre": {
+          "name": "jeton_chiffre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autorite": {
+          "name": "autorite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "source_nom_unique": {
+          "name": "source_nom_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nom"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.synchro": {
+      "name": "synchro",
+      "schema": "",
+      "columns": {
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "dernier_debut": {
+          "name": "dernier_debut",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dernier_succes": {
+          "name": "dernier_succes",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "etat": {
+          "name": "etat",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'jamais'"
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "documents_vus": {
+          "name": "documents_vus",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "documents_changes": {
+          "name": "documents_changes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "synchro_source_id_source_id_fk": {
+          "name": "synchro_source_id_source_id_fk",
+          "tableFrom": "synchro",
+          "tableTo": "source",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.app_setting": {
+      "name": "app_setting",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

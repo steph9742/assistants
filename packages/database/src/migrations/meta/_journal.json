@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787785281001,
+      "tag": "0000_index_corpus",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787786609081,
+      "tag": "0001_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787786702966,
+      "tag": "0002_auth_issuer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787787570922,
+      "tag": "0003_categorie",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787788340552,
+      "tag": "0004_consultation",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787828160695,
+      "tag": "0005_lot_cde",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787828160696,
+      "tag": "0006_zones_indexation",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787828160697,
+      "tag": "0007_embeddings_1024",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787828160698,
+      "tag": "0008_signalement",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787828160699,
+      "tag": "0009_pont_procedures",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787828160700,
+      "tag": "0010_signalement_precision",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787828160701,
+      "tag": "0011_ponts_multivalues",
+      "breakpoints": true
+    }
+  ]
+}

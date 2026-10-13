@@ -1,0 +1,79 @@
+# Reverse proxy interne — gabarit rendu au démarrage (envsubst) avec ${BASE_PATH}.
+# BASE_PATH vide            → service à la racine (/api, /).
+# BASE_PATH=/assistant      → sous-chemin (/assistant/api → /api, /assistant/ → interface).
+# Les variables nginx ($host, $scheme…) ne sont pas dans l'environnement : envsubst les
+# préserve.
+
+server {
+    listen 80;
+    server_name localhost;
+
+    # RÉSOLUTION DYNAMIQUE DES CONTENEURS — sans ça, un simple redémarrage casse tout.
+    #
+    # Écrit `proxy_pass http://server:4000` en dur, nginx résout ce nom UNE SEULE FOIS, au
+    # démarrage, et garde l'adresse. Quand `docker compose up -d` recrée le conteneur du
+    # serveur, celui-ci reçoit une nouvelle adresse — et nginx continue de parler à
+    # l'ancienne. Résultat : 502 sur tout, alors que `docker compose ps` montre les deux
+    # conteneurs sains et que les journaux du serveur sont vides.
+    #
+    # Constaté sur Ouate : `reverse` tournait depuis onze minutes, `server` depuis
+    # cinquante secondes. Le symptôme n'accuse ni l'un ni l'autre.
+    #
+    # 127.0.0.11 est le résolveur interne de Docker. Passer par une VARIABLE dans
+    # `proxy_pass` force nginx à résoudre à chaque requête, avec le cache que fixe `valid`.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    # L'analyse de journaux accepte un extrait long : nginx plafonne à 1 Mo par défaut, ce
+    # qui rejetterait en 413 un collage un peu gros. Aligné sur journaux.taille_max.
+    client_max_body_size 2m;
+
+    # API — le préfixe ${BASE_PATH} est retiré avant transmission (routes /api non préfixées).
+    location ${BASE_PATH}/api {
+        set $cible_api server:4000;
+        rewrite ^${BASE_PATH}(/api.*)$ $1 break;
+        proxy_pass http://$cible_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Un modèle local sur une machine chargée peut mettre plusieurs minutes à répondre
+        # sans être en panne. Le défaut nginx (60 s) couperait AVANT le délai du client
+        # modèle, et l'utilisateur verrait « 504 » là où le serveur aurait fini par répondre.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        # LE TAMPON EST L'ENNEMI DU FLUX, ET L'EN-TÊTE NE SUFFIT PAS À LE DIRE.
+        #
+        # Le serveur répond `X-Accel-Buffering: no`, que nginx honore. Mais cet en-tête est
+        # une DEMANDE portée par la réponse : elle ne vaut que si elle traverse toute la
+        # chaîne, et elle ne dit rien de notre intention à quiconque relit ce fichier. Nous
+        # coupons donc le tampon ici aussi, explicitement — une règle écrite à un seul
+        # endroit, et transmise par un tiers, n'est pas une règle tenue.
+        #
+        # Sans ça, les étapes en cours partent bien mais arrivent toutes ensemble à la fin :
+        # l'utilisateur voit un écran figé, le client conclut à un flux mort et retombe sur
+        # la route simple — celle qui, elle, se fait couper à 60 s par le proxy d'en face.
+        proxy_buffering off;
+        proxy_cache off;
+        # HTTP/1.1 est requis pour qu'une réponse en flux ne soit pas rassemblée : en 1.0,
+        # nginx ne sait pas transmettre un corps par morceaux et attend la fin.
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
+    location ${BASE_PATH}/health {
+        set $cible_sante server:4000;
+        rewrite ^${BASE_PATH}(/health.*)$ $1 break;
+        proxy_pass http://$cible_sante;
+        proxy_set_header Host $host;
+    }
+
+    # Interface Nuxt — sert sous ${BASE_PATH}/ (app.baseURL), on transmet l'URI telle quelle.
+    location ${BASE_PATH}/ {
+        set $cible_app app:3000;
+        proxy_pass http://$cible_app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

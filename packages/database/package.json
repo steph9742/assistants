@@ -1,0 +1,30 @@
+{
+    "name": "@assistants/database",
+    "version": "1.0.0",
+    "private": true,
+    "main": "src/index.ts",
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "generate": "drizzle-kit generate",
+        "migrate": "drizzle-kit migrate"
+    },
+    "dependencies": {
+        "@paralleldrive/cuid2": "^3.3.0",
+        "drizzle-orm": "^0.45.1",
+        "pg": "^8.20.0"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.18.0",
+        "drizzle-kit": "^0.31.9",
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "exports": {
+        ".": "./src/index.ts",
+        "./tables": "./src/schemas.ts",
+        "./registre": "./src/registre/index.ts",
+        "./auth-schema": "./src/schemas/auth-schema.ts"
+    }
+}

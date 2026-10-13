@@ -1,0 +1,1 @@
+ALTER TABLE "source" ADD COLUMN "categorie" text DEFAULT 'procedure' NOT NULL;
